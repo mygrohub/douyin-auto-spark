@@ -62,7 +62,7 @@ async function main(): Promise<void> {
       waitUntil: 'domcontentloaded',
     })
 
-    await page.waitForTimeout(10000)
+    await page.waitForTimeout(300000)
 
     const searchInput = page.locator('input.semi-input[placeholder="搜索"]').first()
     await searchInput.waitFor({ state: 'visible', timeout: 10000 })
