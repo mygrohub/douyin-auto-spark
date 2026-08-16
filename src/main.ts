@@ -64,7 +64,7 @@ async function main(): Promise<void> {
 
     await page.waitForTimeout(300000)
 
-    const searchInput = page.locator('input.semi-input[placeholder="搜索"]').first()
+    const searchInput = page.locator('input.semi-input.semi-input-default[placeholder="搜索"]').first()
     await searchInput.waitFor({ state: 'visible', timeout: 10000 })
 
     // 记录未命中的会话，等其余好友都发完再统一报错，避免一个人改名连累当天所有人。
@@ -75,18 +75,21 @@ async function main(): Promise<void> {
       if (!name) continue
 
       console.log(`开始搜索会话：${name}`)
+      await searchInput.click()
       await searchInput.fill('')
       await searchInput.fill(name)
-      await page.waitForTimeout(1000)
+      // 等待搜索结果加载
+      await page.waitForTimeout(2000)
 
+      // 通过名字文本内容定位搜索结果
       const searchResult = page
-        .locator('.SearchPanelitembox')
+        .locator('[class*="SearchPanel"]')
         .filter({
           has: page.getByText(name, { exact: true }),
         })
         .first()
 
-      if (!(await searchResult.isVisible({ timeout: 5000 }).catch(() => false))) {
+      if (!(await searchResult.isVisible({ timeout: 8000 }).catch(() => false))) {
         console.log(`找不到搜索结果，已跳过：${name}`)
         missingNames.push(name)
         continue
