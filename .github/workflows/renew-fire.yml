@@ -36,6 +36,14 @@ jobs:
           SPARK_MESSAGE_TEMPLATE: ${{ secrets.SPARK_MESSAGE_TEMPLATE }}
         run: bun src/main.ts
 
+      - name: 上传失败截图 (Upload failure screenshot)
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: failure-screenshot
+          path: artifacts/failure-screenshot.png
+          if-no-files-found: warn
+
       - name: 发送失败邮件 (Send failure email)
         if: ${{ failure() }}
         uses: dawidd6/action-send-mail@v18
@@ -48,7 +56,6 @@ jobs:
           subject: 抖音续火任务失败
           to: ${{ secrets.MAIL_ADDRESS }}
           from: ${{ secrets.MAIL_ADDRESS }}
-          attachments: artifacts/failure-screenshot.png
           body: |
             抖音续火任务执行失败
             仓库：${{ github.repository }}
