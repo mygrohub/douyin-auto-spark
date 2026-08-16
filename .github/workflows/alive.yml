@@ -1,0 +1,103 @@
+name: Keep Repositories Alive
+
+on:
+  workflow_dispatch: # 允许手动触发
+  schedule:
+    - cron: '0 0 */28 * *' # 每 28 天运行一次
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Keep repositories alive
+        env:
+          KEEP_ALIVE_PATS: ${{ secrets.KEEP_ALIVE_PATS }}
+          EXTRA_REPOS_SECRET: ${{ secrets.REPOSITORIES_TO_KEEP_ALIVE }}
+          EXTRA_REPOS_VAR: ${{ vars.REPOSITORIES_TO_KEEP_ALIVE }}
+          SELF_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "$EXTRA_REPOS_SECRET" ]; then
+            EXTRA_REPOS="$EXTRA_REPOS_SECRET"
+            echo "Using repository list from Secrets."
+          else
+            EXTRA_REPOS="$EXTRA_REPOS_VAR"
+            echo "Using repository list from Variables."
+          fi
+
+          ALL_REPOS=$(echo "$SELF_REPO,$EXTRA_REPOS" | tr -d ' ' | tr ',' '\n' | sort -u)
+          
+          if [ -n "$EXTRA_REPOS" ] && [ -z "$KEEP_ALIVE_PATS" ]; then
+            echo "Error: External repositories are configured, but KEEP_ALIVE_PATS secret is not set."
+            exit 1
+          fi
+
+          echo "--- Repositories to process ---"
+          echo "$ALL_REPOS"
+          echo "-------------------------------"
+
+          COMMIT_MESSAGES=(
+            "chore: routine maintenance"
+            "ci: trigger periodic build"
+            "docs: sync with latest changes"
+            "style: apply automated formatting"
+            "refactor: minor adjustments"
+          )
+
+          for REPO in $ALL_REPOS; do
+            if [ -z "$REPO" ]; then continue; fi
+            echo ""
+            echo "Processing repository: $REPO"
+            
+            USER=$(echo "$REPO" | cut -d'/' -f1)
+            CLONE_URL=""
+
+            if [ "$REPO" == "$SELF_REPO" ]; then
+              echo "Using GITHUB_TOKEN for self-repository."
+              CLONE_URL="https://x-access-token:$GH_TOKEN@github.com/$REPO.git"
+            else
+              echo "Using PAT for external repository."
+              PAT=$(echo "$KEEP_ALIVE_PATS" | jq -r ".\"${USER}\"")
+
+              if [ "$PAT" == "null" ] || [ -z "$PAT" ]; then
+                echo "Warning: No PAT found for user '$USER'. Skipping $REPO."
+                continue
+              fi
+              CLONE_URL="https://$USER:$PAT@github.com/$REPO.git"
+            fi
+
+            git clone "$CLONE_URL" temp_repo &>/dev/null
+            if [ $? -ne 0 ]; then
+              echo "Error: Failed to clone $REPO. Check permissions and repository path."
+              continue
+            fi
+            
+            cd temp_repo
+            
+            # **NEW**: Dynamically set commit author to the repository owner
+            echo "Configuring Git user as $USER"
+            git config user.name "$USER"
+            git config user.email "$USER@users.noreply.github.com"
+
+            RANDOM_INDEX=$((RANDOM % ${#COMMIT_MESSAGES[@]}))
+            COMMIT_MESSAGE=${COMMIT_MESSAGES[$RANDOM_INDEX]}
+            
+            echo "Using commit message: '$COMMIT_MESSAGE'"
+            
+            git commit --allow-empty -m "$COMMIT_MESSAGE"
+            git push &>/dev/null
+
+            if [ $? -eq 0 ]; then
+              echo "Successfully pushed keep-alive commit to $REPO"
+            else
+              echo "Error: Failed to push to $REPO."
+            fi
+            
+            cd ..
+            rm -rf temp_repo
+          done

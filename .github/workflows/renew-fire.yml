@@ -4,7 +4,8 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "0 0 * * *"
-      timezone: "Asia/Shanghai"
+    - cron: "0 8 * * *"
+    - cron: "0 16 * * *"
 
 jobs:
   run:
