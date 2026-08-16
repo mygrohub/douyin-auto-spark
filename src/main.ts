@@ -62,7 +62,7 @@ async function main(): Promise<void> {
       waitUntil: 'domcontentloaded',
     })
 
-    await page.waitForTimeout(300000)
+    await page.waitForTimeout(30000)
 
     const searchInput = page.locator('input.semi-input.semi-input-default[placeholder="搜索"]').first()
     await searchInput.waitFor({ state: 'visible', timeout: 10000 })
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
 
       // 通过名字文本内容定位搜索结果
       const searchResult = page
-        .locator('[class*="SearchPanel"]')
+        .locator('[class*="SearchPanel"] [class*="SearchPanelitem"]')
         .filter({
           has: page.getByText(name, { exact: true }),
         })
